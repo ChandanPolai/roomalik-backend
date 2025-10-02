@@ -2,7 +2,7 @@
 const asyncHandler = require('express-async-handler');
 const model = require('../models/zindex');
 const { HTTP_STATUS, sendResponse, sendError } = require('../utils/httpUtils');
-const { updateNotificationSchema } = require('../validators/index');
+const { updateNotificationSchema } = require('./validators/index');
 
 // Get All Notifications
 const getAllNotifications = asyncHandler(async (req, res) => {

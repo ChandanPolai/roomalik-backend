@@ -8,7 +8,7 @@ const {
   loginSchema,
   updateProfileSchema,
   resetPasswordSchema,
-} = require('../validators/index');
+} = require('./validators/index');
 const nodemailer = require('nodemailer');
 
 // Register Admin

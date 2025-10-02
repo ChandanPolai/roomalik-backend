@@ -2,7 +2,7 @@
 const asyncHandler = require('express-async-handler');
 const model = require('../models/zindex');
 const { HTTP_STATUS, sendResponse, sendError } = require('../utils/httpUtils');
-const { createPlotSchema, updatePlotSchema } = require('../validators/index');
+const { createPlotSchema, updatePlotSchema } = require('./validators/index');
 const multer = require('multer');
 
 // Multer setup for image uploads (configure Cloudinary in production)

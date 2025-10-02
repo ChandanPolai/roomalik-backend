@@ -2,7 +2,7 @@
 const asyncHandler = require('express-async-handler');
 const model = require('../models/zindex');
 const { HTTP_STATUS, sendResponse, sendError } = require('../utils/httpUtils');
-const { createFinanceSchema, updateFinanceSchema } = require('../validators/index');
+const { createFinanceSchema, updateFinanceSchema } = require('./validators/index');
 
 // Create Finance Record
 const createFinance = asyncHandler(async (req, res) => {

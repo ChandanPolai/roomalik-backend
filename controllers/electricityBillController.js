@@ -2,7 +2,7 @@
 const asyncHandler = require('express-async-handler');
 const model = require('../models/zindex');
 const { HTTP_STATUS, sendResponse, sendError } = require('../utils/httpUtils');
-const { createBillSchema, updateBillSchema } = require('../validators/index');
+const { createBillSchema, updateBillSchema } = require('./validators/index');
 
 // Create Electricity Bill
 const createBill = asyncHandler(async (req, res) => {
