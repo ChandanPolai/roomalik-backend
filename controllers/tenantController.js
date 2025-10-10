@@ -3,34 +3,83 @@ const asyncHandler = require('express-async-handler');
 const model = require('../models/zindex');
 const { HTTP_STATUS, sendResponse, sendError } = require('../utils/httpUtils');
 const { createTenantSchema, updateTenantSchema } = require('./validators/index');
-const multer = require('multer');
 
-const storage = multer.memoryStorage();
-const upload = multer({ storage }).fields([
-  { name: 'aadharFront', maxCount: 1 },
-  { name: 'aadharBack', maxCount: 1 },
-  { name: 'pan', maxCount: 1 },
-  { name: 'photo', maxCount: 1 },
-  { name: 'others', maxCount: 5 },
-  { name: 'agreement', maxCount: 1 },
-  { name: 'familyPhotos', maxCount: 10 },
-]);
+// Normalize file path
+const normalizePath = (p) => (
+    p
+        ? String(p)
+            .replace(/\\/g, '/')
+            .replace(/^\.*\/*/, '')
+        : ''
+);
 
-// Create Tenant
+// ✅ Create Tenant WITH DOCUMENTS
 const createTenant = asyncHandler(async (req, res) => {
   const { error } = createTenantSchema.validate(req.body);
   if (error) {
     return sendError(res, HTTP_STATUS.BAD_REQUEST, error.details[0].message);
   }
 
-  const { name, mobile, email, addresses, emergency, profession, ids, family, agreement, finances, roomId, plotId } = req.body;
+  const { name, mobile, email, addresses, emergency, profession, family, agreement, finances, roomId, plotId } = req.body;
 
+  // Verify room ownership and availability
   const room = await model.Room.findById(roomId).populate('plotId');
   if (!room || room.plotId.ownerId.toString() !== req.admin._id.toString()) {
     return sendError(res, HTTP_STATUS.BAD_REQUEST, 'Invalid or unauthorized room');
   }
   if (room.status !== 'available') {
     return sendError(res, HTTP_STATUS.BAD_REQUEST, 'Room is not available');
+  }
+
+  // Handle uploaded documents
+  const ids = {};
+  
+  if (req.files) {
+    // Aadhar documents
+    if (req.files.aadharFront && req.files.aadharFront[0]) {
+      ids.aadhar = ids.aadhar || {};
+      ids.aadhar.front = normalizePath(req.files.aadharFront[0].path);
+    }
+    if (req.files.aadharBack && req.files.aadharBack[0]) {
+      ids.aadhar = ids.aadhar || {};
+      ids.aadhar.back = normalizePath(req.files.aadharBack[0].path);
+    }
+    
+    // PAN card
+    if (req.files.pan && req.files.pan[0]) {
+      ids.pan = normalizePath(req.files.pan[0].path);
+    }
+    
+    // Tenant photo
+    if (req.files.photo && req.files.photo[0]) {
+      ids.photo = normalizePath(req.files.photo[0].path);
+    }
+    
+    // Other documents
+    if (req.files.others && req.files.others.length > 0) {
+      ids.others = req.files.others.map((file, index) => ({
+        url: normalizePath(file.path),
+        type: req.body.otherTypes ? req.body.otherTypes[index] : 'other',
+      }));
+    }
+  }
+
+  // Handle agreement document
+  let agreementData = agreement;
+  if (req.files && req.files.agreement && req.files.agreement[0]) {
+    agreementData = {
+      ...agreement,
+      document: normalizePath(req.files.agreement[0].path)
+    };
+  }
+
+  // Handle family photos
+  let familyData = family;
+  if (req.files && req.files.familyPhotos && req.files.familyPhotos.length > 0) {
+    familyData = family.map((member, index) => ({
+      ...member,
+      photo: req.files.familyPhotos[index] ? normalizePath(req.files.familyPhotos[index].path) : member.photo
+    }));
   }
 
   const tenant = new model.Tenant({
@@ -41,13 +90,14 @@ const createTenant = asyncHandler(async (req, res) => {
     emergency,
     profession,
     ids,
-    family,
-    agreement,
+    family: familyData,
+    agreement: agreementData,
     finances,
     roomId,
     plotId,
   });
 
+  // Update room status
   room.status = 'occupied';
   await room.save();
   await tenant.save();
@@ -63,81 +113,29 @@ const createTenant = asyncHandler(async (req, res) => {
   return sendResponse(res, HTTP_STATUS.CREATED, tenant, 'Tenant created successfully');
 });
 
-// Upload Tenant Documents
-const uploadTenantDocuments = asyncHandler(async (req, res) => {
-  upload(req, res, async (err) => {
-    if (err) {
-      return sendError(res, HTTP_STATUS.BAD_REQUEST, 'Document upload failed');
-    }
-
-    const tenant = await model.Tenant.findById(req.params.id).populate('roomId');
-    if (!tenant) {
-      return sendError(res, HTTP_STATUS.NOT_FOUND, 'Tenant not found');
-    }
-    if (tenant.roomId.plotId.ownerId.toString() !== req.admin._id.toString()) {
-      return sendError(res, HTTP_STATUS.UNAUTHORIZED, 'Not authorized');
-    }
-
-    const ids = tenant.ids || {};
-    if (req.files.aadharFront) {
-      ids.aadhar = ids.aadhar || {};
-      ids.aadhar.front = `placeholder_url/${req.files.aadharFront[0].originalname}`; // Replace with Cloudinary
-    }
-    if (req.files.aadharBack) {
-      ids.aadhar = ids.aadhar || {};
-      ids.aadhar.back = `placeholder_url/${req.files.aadharBack[0].originalname}`;
-    }
-    if (req.files.pan) {
-      ids.pan = `placeholder_url/${req.files.pan[0].originalname}`;
-    }
-    if (req.files.photo) {
-      ids.photo = `placeholder_url/${req.files.photo[0].originalname}`;
-    }
-    if (req.files.others) {
-      ids.others = req.files.others.map((file) => ({
-        url: `placeholder_url/${file.originalname}`,
-        type: req.body.otherTypes ? req.body.otherTypes[file.originalname] : 'other',
-      }));
-    }
-    if (req.files.agreement) {
-      tenant.agreement.document = `placeholder_url/${req.files.agreement[0].originalname}`;
-    }
-    if (req.files.familyPhotos) {
-      const familyPhotos = req.files.familyPhotos.map((file, index) => ({
-        ...tenant.family[index],
-        photo: `placeholder_url/${file.originalname}`,
-      }));
-      tenant.family = familyPhotos;
-    }
-
-    tenant.ids = ids;
-    await tenant.save();
-
-    return sendResponse(res, HTTP_STATUS.OK, tenant, 'Documents uploaded successfully');
-  });
-});
-
-// Get All Tenants
+// ✅ Get All Tenants
 const getAllTenants = asyncHandler(async (req, res) => {
   const tenants = await model.Tenant.find({
     plotId: { $in: await model.Plot.find({ ownerId: req.admin._id }).distinct('_id') },
-  }).populate('roomId');
+  }).populate('roomId plotId');
   return sendResponse(res, HTTP_STATUS.OK, tenants, 'Tenants retrieved successfully');
 });
 
-// Get Tenant by ID
+// ✅ Get Tenant by ID
 const getTenantById = asyncHandler(async (req, res) => {
-  const tenant = await model.Tenant.findById(req.params.id).populate('roomId');
+  const tenant = await model.Tenant.findById(req.params.id).populate('roomId plotId');
   if (!tenant) {
     return sendError(res, HTTP_STATUS.NOT_FOUND, 'Tenant not found');
   }
-  if (tenant.roomId.plotId.ownerId.toString() !== req.admin._id.toString()) {
+  
+  const room = await model.Room.findById(tenant.roomId).populate('plotId');
+  if (room.plotId.ownerId.toString() !== req.admin._id.toString()) {
     return sendError(res, HTTP_STATUS.UNAUTHORIZED, 'Not authorized');
   }
   return sendResponse(res, HTTP_STATUS.OK, tenant, 'Tenant retrieved successfully');
 });
 
-// Update Tenant
+// ✅ Update Tenant WITH NEW DOCUMENTS
 const updateTenant = asyncHandler(async (req, res) => {
   const { error } = updateTenantSchema.validate(req.body);
   if (error) {
@@ -148,36 +146,90 @@ const updateTenant = asyncHandler(async (req, res) => {
   if (!tenant) {
     return sendError(res, HTTP_STATUS.NOT_FOUND, 'Tenant not found');
   }
-  if (tenant.roomId.plotId.ownerId.toString() !== req.admin._id.toString()) {
+  
+  const room = await model.Room.findById(tenant.roomId).populate('plotId');
+  if (room.plotId.ownerId.toString() !== req.admin._id.toString()) {
     return sendError(res, HTTP_STATUS.UNAUTHORIZED, 'Not authorized');
   }
 
+  // Update basic fields
   Object.assign(tenant, req.body);
+
+  // Handle new uploaded documents
+  if (req.files) {
+    const ids = tenant.ids || {};
+    
+    // Update Aadhar documents
+    if (req.files.aadharFront && req.files.aadharFront[0]) {
+      ids.aadhar = ids.aadhar || {};
+      ids.aadhar.front = normalizePath(req.files.aadharFront[0].path);
+    }
+    if (req.files.aadharBack && req.files.aadharBack[0]) {
+      ids.aadhar = ids.aadhar || {};
+      ids.aadhar.back = normalizePath(req.files.aadharBack[0].path);
+    }
+    
+    // Update PAN card
+    if (req.files.pan && req.files.pan[0]) {
+      ids.pan = normalizePath(req.files.pan[0].path);
+    }
+    
+    // Update photo
+    if (req.files.photo && req.files.photo[0]) {
+      ids.photo = normalizePath(req.files.photo[0].path);
+    }
+    
+    // Update other documents
+    if (req.files.others && req.files.others.length > 0) {
+      const newOthers = req.files.others.map((file, index) => ({
+        url: normalizePath(file.path),
+        type: req.body.otherTypes ? req.body.otherTypes[index] : 'other',
+      }));
+      ids.others = [...(ids.others || []), ...newOthers];
+    }
+    
+    tenant.ids = ids;
+
+    // Update agreement document
+    if (req.files.agreement && req.files.agreement[0]) {
+      tenant.agreement.document = normalizePath(req.files.agreement[0].path);
+    }
+
+    // Update family photos
+    if (req.files.familyPhotos && req.files.familyPhotos.length > 0) {
+      tenant.family = tenant.family.map((member, index) => ({
+        ...member,
+        photo: req.files.familyPhotos[index] ? normalizePath(req.files.familyPhotos[index].path) : member.photo
+      }));
+    }
+  }
+
   await tenant.save();
   return sendResponse(res, HTTP_STATUS.OK, tenant, 'Tenant updated successfully');
 });
 
-// Delete Tenant
+// ✅ Delete Tenant
 const deleteTenant = asyncHandler(async (req, res) => {
   const tenant = await model.Tenant.findById(req.params.id).populate('roomId');
   if (!tenant) {
     return sendError(res, HTTP_STATUS.NOT_FOUND, 'Tenant not found');
   }
-  if (tenant.roomId.plotId.ownerId.toString() !== req.admin._id.toString()) {
+  
+  const room = await model.Room.findById(tenant.roomId).populate('plotId');
+  if (room.plotId.ownerId.toString() !== req.admin._id.toString()) {
     return sendError(res, HTTP_STATUS.UNAUTHORIZED, 'Not authorized');
   }
 
-  const room = await model.Room.findById(tenant.roomId);
+  // Make room available again
   room.status = 'available';
   await room.save();
 
-  await tenant.remove();
+  await tenant.deleteOne();
   return sendResponse(res, HTTP_STATUS.OK, null, 'Tenant deleted successfully');
 });
 
 module.exports = {
   createTenant,
-  uploadTenantDocuments,
   getAllTenants,
   getTenantById,
   updateTenant,

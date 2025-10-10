@@ -3,12 +3,17 @@ const asyncHandler = require('express-async-handler');
 const model = require('../models/zindex');
 const { HTTP_STATUS, sendResponse, sendError } = require('../utils/httpUtils');
 const { createRoomSchema, updateRoomSchema } = require('./validators/index');
-const multer = require('multer');
 
-const storage = multer.memoryStorage();
-const upload = multer({ storage }).array('images', 10);
+// Normalize file path (same pattern)
+const normalizePath = (p) => (
+    p
+        ? String(p)
+            .replace(/\\/g, '/')
+            .replace(/^\.*\/*/, '')
+        : ''
+);
 
-// Create Room
+// ✅ Create Room WITH IMAGES
 const createRoom = asyncHandler(async (req, res) => {
   const { error } = createRoomSchema.validate(req.body);
   if (error) {
@@ -16,9 +21,23 @@ const createRoom = asyncHandler(async (req, res) => {
   }
 
   const { number, size, type, rent, deposit, furnished, floor, facing, amenities, status, plotId } = req.body;
+  
+  // Verify plot ownership
   const plot = await model.Plot.findById(plotId);
   if (!plot || plot.ownerId.toString() !== req.admin._id.toString()) {
     return sendError(res, HTTP_STATUS.BAD_REQUEST, 'Invalid or unauthorized plot');
+  }
+
+  // Handle uploaded images
+  const imageUrls = [];
+  if (req.files && req.files.length > 0) {
+    req.files.forEach((file) => {
+      imageUrls.push({
+        url: normalizePath(file.path),
+        caption: '',
+        uploadedAt: new Date(),
+      });
+    });
   }
 
   const room = new model.Room({
@@ -33,52 +52,25 @@ const createRoom = asyncHandler(async (req, res) => {
     amenities,
     status,
     plotId,
+    images: imageUrls, // Save images
   });
 
   await room.save();
   return sendResponse(res, HTTP_STATUS.CREATED, room, 'Room created successfully');
 });
 
-// Upload Room Images
-const uploadRoomImages = asyncHandler(async (req, res) => {
-  upload(req, res, async (err) => {
-    if (err) {
-      return sendError(res, HTTP_STATUS.BAD_REQUEST, 'Image upload failed');
-    }
-
-    const room = await model.Room.findById(req.params.id).populate('plotId');
-    if (!room) {
-      return sendError(res, HTTP_STATUS.NOT_FOUND, 'Room not found');
-    }
-    if (room.plotId.ownerId.toString() !== req.admin._id.toString()) {
-      return sendError(res, HTTP_STATUS.UNAUTHORIZED, 'Not authorized to upload images for this room');
-    }
-
-    const imageUrls = req.files.map((file) => ({
-      url: `placeholder_url/${file.originalname}`, // Replace with Cloudinary upload logic
-      caption: req.body.captions ? req.body.captions[file.originalname] : '',
-      uploadedAt: new Date(),
-    }));
-
-    room.images.push(...imageUrls);
-    await room.save();
-
-    return sendResponse(res, HTTP_STATUS.OK, room.images, 'Images uploaded successfully');
-  });
-});
-
-// Get All Rooms
+// ✅ Get All Rooms
 const getAllRooms = asyncHandler(async (req, res) => {
   const { status, plotId } = req.query;
   const query = { plotId: { $in: await model.Plot.find({ ownerId: req.admin._id }).distinct('_id') } };
   if (status) query.status = status;
   if (plotId) query.plotId = plotId;
 
-  const rooms = await model.Room.find(query);
+  const rooms = await model.Room.find(query).populate('plotId');
   return sendResponse(res, HTTP_STATUS.OK, rooms, 'Rooms retrieved successfully');
 });
 
-// Get Room by ID
+// ✅ Get Room by ID
 const getRoomById = asyncHandler(async (req, res) => {
   const room = await model.Room.findById(req.params.id).populate('plotId');
   if (!room) {
@@ -90,7 +82,7 @@ const getRoomById = asyncHandler(async (req, res) => {
   return sendResponse(res, HTTP_STATUS.OK, room, 'Room retrieved successfully');
 });
 
-// Update Room
+// ✅ Update Room WITH NEW IMAGES
 const updateRoom = asyncHandler(async (req, res) => {
   const { error } = updateRoomSchema.validate(req.body);
   if (error) {
@@ -105,12 +97,24 @@ const updateRoom = asyncHandler(async (req, res) => {
     return sendError(res, HTTP_STATUS.UNAUTHORIZED, 'Not authorized');
   }
 
+  // Update basic fields
   Object.assign(room, req.body);
+
+  // Handle new images if uploaded (APPEND to existing)
+  if (req.files && req.files.length > 0) {
+    const newImages = req.files.map((file) => ({
+      url: normalizePath(file.path),
+      caption: '',
+      uploadedAt: new Date(),
+    }));
+    room.images.push(...newImages);
+  }
+
   await room.save();
   return sendResponse(res, HTTP_STATUS.OK, room, 'Room updated successfully');
 });
 
-// Delete Room
+// ✅ Delete Room
 const deleteRoom = asyncHandler(async (req, res) => {
   const room = await model.Room.findById(req.params.id).populate('plotId');
   if (!room) {
@@ -120,13 +124,12 @@ const deleteRoom = asyncHandler(async (req, res) => {
     return sendError(res, HTTP_STATUS.UNAUTHORIZED, 'Not authorized');
   }
 
-  await room.remove();
+  await room.deleteOne();
   return sendResponse(res, HTTP_STATUS.OK, null, 'Room deleted successfully');
 });
 
 module.exports = {
   createRoom,
-  uploadRoomImages,
   getAllRooms,
   getRoomById,
   updateRoom,

@@ -4,34 +4,36 @@ const cookieParser = require('cookie-parser');
 const connectDB = require('./config/db');
 const adminRoutes = require('./routes/adminRoutes');
 const logger = require('morgan');
-const cors = require('cors'); // Add CORS
+const cors = require('cors');
+const path = require('path');
 
 dotenv.config();
 connectDB();
 
 const app = express();
 
-// Add CORS middleware
 app.use(cors({
-  origin: ['http://localhost:8081', 'exp://localhost:8081'], // Expo default
+  origin: ['http://localhost:8081', 'exp://localhost:8081'],
   credentials: true
 }));
 
 app.use(express.json());
 app.use(cookieParser());
 
+// ✅✅ Serve uploaded files
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+
 if (process.env.NODE_ENV === 'development') {
     app.use(logger('dev'));
 }
 
-// Test route
 app.get('/api/test', (req, res) => {
   res.json({ message: 'Server is working!' });
 });
 
 app.use('/api', adminRoutes);
 
-// Error handling middleware
+// Error handling
 app.use((err, req, res, next) => {
   console.error('Server Error:', err);
   res.status(500).json({ 
@@ -40,7 +42,6 @@ app.use((err, req, res, next) => {
   });
 });
 
-// 404 handler
 app.use('*', (req, res) => {
   res.status(404).json({
     success: false,
