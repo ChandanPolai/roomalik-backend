@@ -3,6 +3,7 @@ const asyncHandler = require('express-async-handler');
 const model = require('../models/zindex');
 const { HTTP_STATUS, sendResponse, sendError } = require('../utils/httpUtils');
 const { createPlotSchema, updatePlotSchema } = require('./validators/index');
+const parseJsonFields = require('../utils/parseJsonFields');
 
 // Normalize file path (same as your first project)
 const normalizePath = (p) => (
@@ -15,7 +16,8 @@ const normalizePath = (p) => (
 
 // ✅ Create Plot WITH IMAGES
 const createPlot = asyncHandler(async (req, res) => {
-  const { error } = createPlotSchema.validate(req.body);
+  req.body = parseJsonFields(req.body);
+  const { error, value } = createPlotSchema.validate(req.body);
   if (error) {
     return sendError(res, HTTP_STATUS.BAD_REQUEST, error.details[0].message);
   }
@@ -69,6 +71,7 @@ const getPlotById = asyncHandler(async (req, res) => {
 
 // ✅ Update Plot WITH NEW IMAGES
 const updatePlot = asyncHandler(async (req, res) => {
+  req.body = parseJsonFields(req.body);
   const { error } = updatePlotSchema.validate(req.body);
   if (error) {
     return sendError(res, HTTP_STATUS.BAD_REQUEST, error.details[0].message);

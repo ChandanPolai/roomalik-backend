@@ -1,4 +1,5 @@
 // models/plot.model.js
+const { required } = require('joi');
 const mongoose = require('mongoose');
 
 const plotSchema = new mongoose.Schema({
@@ -8,15 +9,15 @@ const plotSchema = new mongoose.Schema({
     trim: true,
   },
   address: {
-    street: { type: String, required: true, trim: true },
-    city: { type: String, required: true, trim: true },
-    state: { type: String, required: true, trim: true },
-    country: { type: String, required: true, trim: true },
-    pincode: { type: String, required: true, trim: true },
+    street: { type: String,  trim: true },
+    city: { type: String,  trim: true },
+    state: { type: String,  trim: true },
+    country: { type: String,  trim: true },
+    pincode: { type: String,  trim: true },
   },
   totalArea: {
     type: Number, // In square feet
-    required: true,
+    
   },
   constructionYear: {
     type: Number,
