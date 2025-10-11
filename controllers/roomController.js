@@ -3,6 +3,7 @@ const asyncHandler = require('express-async-handler');
 const model = require('../models/zindex');
 const { HTTP_STATUS, sendResponse, sendError } = require('../utils/httpUtils');
 const { createRoomSchema, updateRoomSchema } = require('./validators/index');
+const parseJsonFields = require('../utils/parseJsonFields');
 
 // Normalize file path (same pattern)
 const normalizePath = (p) => (
@@ -15,6 +16,7 @@ const normalizePath = (p) => (
 
 // ✅ Create Room WITH IMAGES
 const createRoom = asyncHandler(async (req, res) => {
+  req.body = parseJsonFields(req.body);
   const { error } = createRoomSchema.validate(req.body);
   if (error) {
     return sendError(res, HTTP_STATUS.BAD_REQUEST, error.details[0].message);
@@ -84,6 +86,7 @@ const getRoomById = asyncHandler(async (req, res) => {
 
 // ✅ Update Room WITH NEW IMAGES
 const updateRoom = asyncHandler(async (req, res) => {
+  req.body = parseJsonFields(req.body);
   const { error } = updateRoomSchema.validate(req.body);
   if (error) {
     return sendError(res, HTTP_STATUS.BAD_REQUEST, error.details[0].message);

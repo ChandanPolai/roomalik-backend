@@ -3,6 +3,7 @@ const asyncHandler = require('express-async-handler');
 const model = require('../models/zindex');
 const { HTTP_STATUS, sendResponse, sendError } = require('../utils/httpUtils');
 const { createTenantSchema, updateTenantSchema } = require('./validators/index');
+const parseJsonFields = require('../utils/parseJsonFields');
 
 // Normalize file path
 const normalizePath = (p) => (
@@ -15,6 +16,7 @@ const normalizePath = (p) => (
 
 // ✅ Create Tenant WITH DOCUMENTS
 const createTenant = asyncHandler(async (req, res) => {
+  req.body = parseJsonFields(req.body);
   const { error } = createTenantSchema.validate(req.body);
   if (error) {
     return sendError(res, HTTP_STATUS.BAD_REQUEST, error.details[0].message);
@@ -137,6 +139,7 @@ const getTenantById = asyncHandler(async (req, res) => {
 
 // ✅ Update Tenant WITH NEW DOCUMENTS
 const updateTenant = asyncHandler(async (req, res) => {
+    req.body = parseJsonFields(req.body);
   const { error } = updateTenantSchema.validate(req.body);
   if (error) {
     return sendError(res, HTTP_STATUS.BAD_REQUEST, error.details[0].message);
