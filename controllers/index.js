@@ -5,6 +5,9 @@ const {
   getProfile,
   updateProfile,
   resetPassword,
+  changePassword,
+  logoutAdmin,
+
 } = require('./authController');
 const {
   createPlot,
@@ -70,6 +73,8 @@ module.exports = {
   getProfile,
   updateProfile,
   resetPassword,
+  changePassword,
+  logoutAdmin,
   createPlot,
   uploadPlotImages,
   getAllPlots,

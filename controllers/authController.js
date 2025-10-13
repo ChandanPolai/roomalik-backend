@@ -1,55 +1,76 @@
-// controllers/authController.js
 const asyncHandler = require('express-async-handler');
 const jwt = require('jsonwebtoken');
 const model = require('../models/zindex');
 const { HTTP_STATUS, sendResponse, sendError } = require('../utils/httpUtils');
-const {
-  registerSchema,
-  loginSchema,
+const { 
+  registerSchema, 
+  loginSchema, 
   updateProfileSchema,
-  resetPasswordSchema,
-} = require('./validators/index');
-const nodemailer = require('nodemailer');
+  changePasswordSchema,
+  resetPasswordSchema
+} = require('../controllers/validators/admin.validator');
 
-// Register Admin
+// Normalize file path
+const normalizePath = (p) => (
+  p
+    ? String(p)
+        .replace(/\\/g, '/')
+        .replace(/^\.*\/*/, '')
+    : ''
+);
+
+// ✅ Register Admin (with avatar upload)
 const registerAdmin = asyncHandler(async (req, res) => {
   const { error } = registerSchema.validate(req.body);
   if (error) {
     return sendError(res, HTTP_STATUS.BAD_REQUEST, error.details[0].message);
   }
 
-  const { email, password, name, phone, address, role } = req.body;
+  const { email, password, name, phone, role } = req.body;
 
   let admin = await model.Admin.findOne({ email });
   if (admin) {
     return sendError(res, HTTP_STATUS.BAD_REQUEST, 'Admin already exists');
   }
 
-  admin = new model.Admin({ email, password, name, phone, address, role });
+  // Handle avatar upload
+  let avatarUrl = '';
+  if (req.file) {
+    avatarUrl = normalizePath(req.file.path);
+  }
+
+  admin = new model.Admin({ 
+    email, 
+    password, 
+    name, 
+    phone, 
+    role,
+    avatar: avatarUrl
+  });
   await admin.save();
 
   const payload = { id: admin._id };
   const token = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: '1h' });
 
-  res.cookie('token', token, {
-    httpOnly: true,
-    maxAge: 3600000, // 1 hour
+  res.cookie('token', token, { 
+    httpOnly: true, 
+    maxAge: 3600000,
     secure: process.env.NODE_ENV === 'production',
-    sameSite: 'strict',
+    sameSite: 'strict'
   });
 
-  return sendResponse(res, HTTP_STATUS.CREATED, {
-    id: admin._id,
-    email,
-    name,
-    phone,
-    address,
+  return sendResponse(res, HTTP_STATUS.CREATED, { 
+    id: admin._id, 
+    email, 
+    name, 
+    phone, 
     role: admin.role,
-    token,
+    avatar: admin.avatar,
+    token 
   }, 'Admin registered successfully');
 });
 
-// Login Admin
+// ✅ Login Admin
 const loginAdmin = asyncHandler(async (req, res) => {
   const { error } = loginSchema.validate(req.body);
   if (error) {
@@ -59,8 +80,12 @@ const loginAdmin = asyncHandler(async (req, res) => {
   const { email, password } = req.body;
   const admin = await model.Admin.findOne({ email });
 
-  if (!admin || !admin.isActive) {
-    return sendError(res, HTTP_STATUS.BAD_REQUEST, 'Invalid credentials or account deactivated');
+  if (!admin) {
+    return sendError(res, HTTP_STATUS.BAD_REQUEST, 'Invalid credentials');
+  }
+
+  if (!admin.isActive) {
+    return sendError(res, HTTP_STATUS.BAD_REQUEST, 'Account is deactivated');
   }
 
   const isMatch = await admin.matchPassword(password);
@@ -68,48 +93,57 @@ const loginAdmin = asyncHandler(async (req, res) => {
     return sendError(res, HTTP_STATUS.BAD_REQUEST, 'Invalid credentials');
   }
 
+  // Update last login
   admin.lastLogin = new Date();
   await admin.save();
 
   const payload = { id: admin._id };
   const token = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: '1h' });
 
-  res.cookie('token', token, {
-    httpOnly: true,
+  res.cookie('token', token, { 
+    httpOnly: true, 
     maxAge: 3600000,
     secure: process.env.NODE_ENV === 'production',
-    sameSite: 'strict',
+    sameSite: 'strict'
   });
 
-  return sendResponse(res, HTTP_STATUS.OK, {
-    id: admin._id,
-    email,
-    name: admin.name,
-    phone: admin.phone,
-    address: admin.address,
+  return sendResponse(res, HTTP_STATUS.OK, { 
+    id: admin._id, 
+    email, 
+    name: admin.name, 
+    phone: admin.phone, 
     role: admin.role,
     avatar: admin.avatar,
-    token,
+    token 
   }, 'Login successful');
 });
 
-// Get Profile
+// ✅ Logout Admin
+const logoutAdmin = asyncHandler(async (req, res) => {
+  res.cookie('token', '', {
+    httpOnly: true,
+    expires: new Date(0),
+  });
+
+  return sendResponse(res, HTTP_STATUS.OK, null, 'Logout successful');
+});
+
+// ✅ Get Profile
 const getProfile = asyncHandler(async (req, res) => {
   return sendResponse(res, HTTP_STATUS.OK, {
     id: req.admin._id,
     email: req.admin.email,
     name: req.admin.name,
     phone: req.admin.phone,
-    address: req.admin.address,
     avatar: req.admin.avatar,
     role: req.admin.role,
     isActive: req.admin.isActive,
     lastLogin: req.admin.lastLogin,
-    createdAt: req.admin.createdAt,
+    createdAt: req.admin.createdAt
   }, 'Profile fetched successfully');
 });
 
-// Update Profile
+// ✅ Update Profile (with avatar upload)
 const updateProfile = asyncHandler(async (req, res) => {
   const { error } = updateProfileSchema.validate(req.body);
   if (error) {
@@ -121,11 +155,14 @@ const updateProfile = asyncHandler(async (req, res) => {
     return sendError(res, HTTP_STATUS.NOT_FOUND, 'Admin not found');
   }
 
+  // Update basic fields
   if (req.body.name) admin.name = req.body.name;
   if (req.body.phone) admin.phone = req.body.phone;
-  if (req.body.address) admin.address = req.body.address;
-  if (req.body.avatar) admin.avatar = req.body.avatar; // Assuming avatar is uploaded via Multer/Cloudinary
-  if (req.body.role && req.admin.role === 'superadmin') admin.role = req.body.role;
+
+  // Handle avatar upload
+  if (req.file) {
+    admin.avatar = normalizePath(req.file.path);
+  }
 
   await admin.save();
 
@@ -134,52 +171,65 @@ const updateProfile = asyncHandler(async (req, res) => {
     email: admin.email,
     name: admin.name,
     phone: admin.phone,
-    address: admin.address,
     avatar: admin.avatar,
-    role: admin.role,
+    role: admin.role
   }, 'Profile updated successfully');
 });
 
-// Reset Password (Send OTP/Link)
+// ✅ Change Password
+const changePassword = asyncHandler(async (req, res) => {
+  const { error } = changePasswordSchema.validate(req.body);
+  if (error) {
+    return sendError(res, HTTP_STATUS.BAD_REQUEST, error.details[0].message);
+  }
+
+  const { currentPassword, newPassword } = req.body;
+
+  const admin = await model.Admin.findById(req.admin._id);
+  if (!admin) {
+    return sendError(res, HTTP_STATUS.NOT_FOUND, 'Admin not found');
+  }
+
+  // Verify current password
+  const isMatch = await admin.matchPassword(currentPassword);
+  if (!isMatch) {
+    return sendError(res, HTTP_STATUS.BAD_REQUEST, 'Current password is incorrect');
+  }
+
+  // Update to new password
+  admin.password = newPassword;
+  await admin.save();
+
+  return sendResponse(res, HTTP_STATUS.OK, null, 'Password changed successfully');
+});
+
+// ✅ Reset Password (Forgot Password)
 const resetPassword = asyncHandler(async (req, res) => {
   const { error } = resetPasswordSchema.validate(req.body);
   if (error) {
     return sendError(res, HTTP_STATUS.BAD_REQUEST, error.details[0].message);
   }
 
-  const { email } = req.body;
+  const { email, newPassword } = req.body;
+
   const admin = await model.Admin.findOne({ email });
   if (!admin) {
     return sendError(res, HTTP_STATUS.NOT_FOUND, 'Admin not found');
   }
 
-  // Generate OTP or reset token
-  const resetToken = jwt.sign({ id: admin._id }, process.env.JWT_SECRET, { expiresIn: '15m' });
+  // Update password
+  admin.password = newPassword;
+  await admin.save();
 
-  // Send email with reset link (Nodemailer setup)
-  const transporter = nodemailer.createTransport({
-    service: 'Gmail',
-    auth: {
-      user: process.env.EMAIL_USER,
-      pass: process.env.EMAIL_PASS,
-    },
-  });
-
-  const mailOptions = {
-    from: process.env.EMAIL_USER,
-    to: admin.email,
-    subject: 'Password Reset Request',
-    text: `Click this link to reset your password: ${process.env.CLIENT_URL}/reset-password/${resetToken}`,
-  };
-
-  await transporter.sendMail(mailOptions);
-  return sendResponse(res, HTTP_STATUS.OK, null, 'Password reset link sent to email');
+  return sendResponse(res, HTTP_STATUS.OK, null, 'Password reset successfully');
 });
 
-module.exports = {
-  registerAdmin,
-  loginAdmin,
-  getProfile,
+module.exports = { 
+  registerAdmin, 
+  loginAdmin, 
+  logoutAdmin,
+  getProfile, 
   updateProfile,
-  resetPassword,
+  changePassword,
+  resetPassword
 };

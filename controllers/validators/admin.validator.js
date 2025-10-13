@@ -15,14 +15,23 @@ const loginSchema = Joi.object({
 
 const updateProfileSchema = Joi.object({
   name: Joi.string().optional(),
-  phone: Joi.string().min(10).optional(),
-  avatar: Joi.string().uri().optional(),
-  role: Joi.string().valid('admin', 'superadmin').optional(),
-  permissions: Joi.array().items(Joi.string()).optional()
+  phone: Joi.string().min(10).optional()
+});
+
+const changePasswordSchema = Joi.object({
+  currentPassword: Joi.string().required(),
+  newPassword: Joi.string().min(6).required()
+});
+
+const resetPasswordSchema = Joi.object({
+  email: Joi.string().email().required(),
+  newPassword: Joi.string().min(6).required()
 });
 
 module.exports = {
   registerSchema,
   loginSchema,
-  updateProfileSchema
+  updateProfileSchema,
+  changePasswordSchema,
+  resetPasswordSchema
 };

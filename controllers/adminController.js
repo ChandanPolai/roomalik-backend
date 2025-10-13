@@ -5,9 +5,21 @@ const { HTTP_STATUS, sendResponse, sendError } = require('../utils/httpUtils');
 const { 
   registerSchema, 
   loginSchema, 
-  updateProfileSchema 
+  updateProfileSchema,
+  changePasswordSchema,
+  resetPasswordSchema
 } = require('../controllers/validators/admin.validator');
 
+// Normalize file path
+const normalizePath = (p) => (
+  p
+    ? String(p)
+        .replace(/\\/g, '/')
+        .replace(/^\.*\/*/, '')
+    : ''
+);
+
+// ✅ Register Admin (with avatar upload)
 const registerAdmin = asyncHandler(async (req, res) => {
   const { error } = registerSchema.validate(req.body);
   if (error) {
@@ -21,7 +33,20 @@ const registerAdmin = asyncHandler(async (req, res) => {
     return sendError(res, HTTP_STATUS.BAD_REQUEST, 'Admin already exists');
   }
 
-  admin = new model.Admin({ email, password, name, phone, role });
+  // Handle avatar upload
+  let avatarUrl = '';
+  if (req.file) {
+    avatarUrl = normalizePath(req.file.path);
+  }
+
+  admin = new model.Admin({ 
+    email, 
+    password, 
+    name, 
+    phone, 
+    role,
+    avatar: avatarUrl
+  });
   await admin.save();
 
   const payload = { id: admin._id };
@@ -40,10 +65,12 @@ const registerAdmin = asyncHandler(async (req, res) => {
     name, 
     phone, 
     role: admin.role,
+    avatar: admin.avatar,
     token 
   }, 'Admin registered successfully');
 });
 
+// ✅ Login Admin
 const loginAdmin = asyncHandler(async (req, res) => {
   const { error } = loginSchema.validate(req.body);
   if (error) {
@@ -91,6 +118,17 @@ const loginAdmin = asyncHandler(async (req, res) => {
   }, 'Login successful');
 });
 
+// ✅ Logout Admin
+const logoutAdmin = asyncHandler(async (req, res) => {
+  res.cookie('token', '', {
+    httpOnly: true,
+    expires: new Date(0),
+  });
+
+  return sendResponse(res, HTTP_STATUS.OK, null, 'Logout successful');
+});
+
+// ✅ Get Profile
 const getProfile = asyncHandler(async (req, res) => {
   return sendResponse(res, HTTP_STATUS.OK, {
     id: req.admin._id,
@@ -99,13 +137,13 @@ const getProfile = asyncHandler(async (req, res) => {
     phone: req.admin.phone,
     avatar: req.admin.avatar,
     role: req.admin.role,
-    permissions: req.admin.permissions,
     isActive: req.admin.isActive,
     lastLogin: req.admin.lastLogin,
     createdAt: req.admin.createdAt
   }, 'Profile fetched successfully');
 });
 
+// ✅ Update Profile (with avatar upload)
 const updateProfile = asyncHandler(async (req, res) => {
   const { error } = updateProfileSchema.validate(req.body);
   if (error) {
@@ -117,11 +155,14 @@ const updateProfile = asyncHandler(async (req, res) => {
     return sendError(res, HTTP_STATUS.NOT_FOUND, 'Admin not found');
   }
 
+  // Update basic fields
   if (req.body.name) admin.name = req.body.name;
   if (req.body.phone) admin.phone = req.body.phone;
-  if (req.body.avatar) admin.avatar = req.body.avatar;
-  if (req.body.role) admin.role = req.body.role;
-  if (req.body.permissions) admin.permissions = req.body.permissions;
+
+  // Handle avatar upload
+  if (req.file) {
+    admin.avatar = normalizePath(req.file.path);
+  }
 
   await admin.save();
 
@@ -131,45 +172,64 @@ const updateProfile = asyncHandler(async (req, res) => {
     name: admin.name,
     phone: admin.phone,
     avatar: admin.avatar,
-    role: admin.role,
-    permissions: admin.permissions
+    role: admin.role
   }, 'Profile updated successfully');
 });
 
-const getAllAdmins = asyncHandler(async (req, res) => {
-  const admins = await model.Admin.find().select('-password');
-  return sendResponse(res, HTTP_STATUS.OK, admins, 'Admins retrieved successfully');
-});
-
-const getAdminById = asyncHandler(async (req, res) => {
-  const admin = await model.Admin.findById(req.params.id).select('-password');
-  if (!admin) {
-    return sendError(res, HTTP_STATUS.NOT_FOUND, 'Admin not found');
+// ✅ Change Password
+const changePassword = asyncHandler(async (req, res) => {
+  const { error } = changePasswordSchema.validate(req.body);
+  if (error) {
+    return sendError(res, HTTP_STATUS.BAD_REQUEST, error.details[0].message);
   }
-  return sendResponse(res, HTTP_STATUS.OK, admin, 'Admin retrieved successfully');
-});
 
-const toggleAdminStatus = asyncHandler(async (req, res) => {
-  const admin = await model.Admin.findById(req.params.id);
+  const { currentPassword, newPassword } = req.body;
+
+  const admin = await model.Admin.findById(req.admin._id);
   if (!admin) {
     return sendError(res, HTTP_STATUS.NOT_FOUND, 'Admin not found');
   }
 
-  admin.isActive = !admin.isActive;
+  // Verify current password
+  const isMatch = await admin.matchPassword(currentPassword);
+  if (!isMatch) {
+    return sendError(res, HTTP_STATUS.BAD_REQUEST, 'Current password is incorrect');
+  }
+
+  // Update to new password
+  admin.password = newPassword;
   await admin.save();
 
-  return sendResponse(res, HTTP_STATUS.OK, {
-    id: admin._id,
-    isActive: admin.isActive
-  }, `Admin ${admin.isActive ? 'activated' : 'deactivated'} successfully`);
+  return sendResponse(res, HTTP_STATUS.OK, null, 'Password changed successfully');
+});
+
+// ✅ Reset Password (Forgot Password)
+const resetPassword = asyncHandler(async (req, res) => {
+  const { error } = resetPasswordSchema.validate(req.body);
+  if (error) {
+    return sendError(res, HTTP_STATUS.BAD_REQUEST, error.details[0].message);
+  }
+
+  const { email, newPassword } = req.body;
+
+  const admin = await model.Admin.findOne({ email });
+  if (!admin) {
+    return sendError(res, HTTP_STATUS.NOT_FOUND, 'Admin not found');
+  }
+
+  // Update password
+  admin.password = newPassword;
+  await admin.save();
+
+  return sendResponse(res, HTTP_STATUS.OK, null, 'Password reset successfully');
 });
 
 module.exports = { 
   registerAdmin, 
   loginAdmin, 
+  logoutAdmin,
   getProfile, 
   updateProfile,
-  getAllAdmins,
-  getAdminById,
-  toggleAdminStatus
+  changePassword,
+  resetPassword
 };
