@@ -17,10 +17,10 @@ const normalizePath = (p) => (
 // ✅ Create Tenant WITH DOCUMENTS
 const createTenant = asyncHandler(async (req, res) => {
   req.body = parseJsonFields(req.body);
-  const { error } = createTenantSchema.validate(req.body);
-  if (error) {
-    return sendError(res, HTTP_STATUS.BAD_REQUEST, error.details[0].message);
-  }
+  // const { error } = createTenantSchema.validate(req.body);
+  // if (error) {
+  //   return sendError(res, HTTP_STATUS.BAD_REQUEST, error.details[0].message);
+  // }
 
   const { name, mobile, email, addresses, emergency, profession, family, agreement, finances, roomId, plotId } = req.body;
 
@@ -140,10 +140,10 @@ const getTenantById = asyncHandler(async (req, res) => {
 // ✅ Update Tenant WITH NEW DOCUMENTS
 const updateTenant = asyncHandler(async (req, res) => {
     req.body = parseJsonFields(req.body);
-  const { error } = updateTenantSchema.validate(req.body);
-  if (error) {
-    return sendError(res, HTTP_STATUS.BAD_REQUEST, error.details[0].message);
-  }
+  // const { error } = updateTenantSchema.validate(req.body);
+  // if (error) {
+  //   return sendError(res, HTTP_STATUS.BAD_REQUEST, error.details[0].message);
+  // }
 
   const tenant = await model.Tenant.findById(req.params.id).populate('roomId');
   if (!tenant) {
