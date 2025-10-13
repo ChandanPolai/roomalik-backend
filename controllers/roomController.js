@@ -17,13 +17,13 @@ const normalizePath = (p) => (
 // ✅ Create Room WITH IMAGES
 const createRoom = asyncHandler(async (req, res) => {
   req.body = parseJsonFields(req.body);
-  const { error } = createRoomSchema.validate(req.body);
-  if (error) {
-    return sendError(res, HTTP_STATUS.BAD_REQUEST, error.details[0].message);
-  }
+  // const { error } = createRoomSchema.validate(req.body);
+  // if (error) {
+  //   return sendError(res, HTTP_STATUS.BAD_REQUEST, error.details[0].message);
+  // }
 
   const { number, size, type, rent, deposit, furnished, floor, facing, amenities, status, plotId } = req.body;
-  
+  console.log("------", req.body)
   // Verify plot ownership
   const plot = await model.Plot.findById(plotId);
   if (!plot || plot.ownerId.toString() !== req.admin._id.toString()) {
@@ -87,10 +87,10 @@ const getRoomById = asyncHandler(async (req, res) => {
 // ✅ Update Room WITH NEW IMAGES
 const updateRoom = asyncHandler(async (req, res) => {
   req.body = parseJsonFields(req.body);
-  const { error } = updateRoomSchema.validate(req.body);
-  if (error) {
-    return sendError(res, HTTP_STATUS.BAD_REQUEST, error.details[0].message);
-  }
+  // const { error } = updateRoomSchema.validate(req.body);
+  // if (error) {
+  //   return sendError(res, HTTP_STATUS.BAD_REQUEST, error.details[0].message);
+  // }
 
   const room = await model.Room.findById(req.params.id).populate('plotId');
   if (!room) {
