@@ -49,6 +49,20 @@ const {
   deleteNotification,
 } = require('../controllers/index');
 
+const { getDashboardData } = require('../controllers/dashboardController');
+
+const { 
+  generateRent, 
+  recordRentPayment, 
+  getAllRents,
+  addElectricityToRent 
+} = require('../controllers/rentController');
+
+const { 
+  recordElectricityReading, 
+  getRoomReadings 
+} = require('../controllers/electricityController');
+
 
 const { uploader } = require('../middleware/files'); // Import uploader
 // ✅ Plot Image Uploader
@@ -147,6 +161,25 @@ router.delete('/contacts/:id', protect, deleteContact);
 router.get('/notifications', protect, getAllNotifications);
 router.put('/notifications/:id/read', protect, markNotificationRead);
 router.delete('/notifications/:id', protect, deleteNotification);
+
+
+// ✅ Dashboard Routes
+router.get('/dashboard', protect, getDashboardData);
+
+// ✅ Rent Management Routes
+router.post('/rents/generate', protect, generateRent);
+router.post('/rents/payment', protect, recordRentPayment);
+router.get('/rents', protect, getAllRents);
+router.post('/rents/add-electricity', protect, addElectricityToRent);
+
+// ✅ Electricity Routes
+router.post('/electricity/readings', protect, recordElectricityReading);
+router.get('/electricity/room/:roomId', protect, getRoomReadings);
+
+
+
+
+
 
 // // Superadmin Routes (Admin Management)
 // router.get('/admins', protect, requireRole('superadmin'), getAllAdmins);

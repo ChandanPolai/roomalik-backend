@@ -8,6 +8,8 @@ const ElectricityBill = require('./electricityBill.model');
 const Payment = require('./payment.model');
 const Contact = require('./contact.model');
 const Notification = require('./notification.model');
+const Rent = require('./rent.model');
+const ElectricityReading = require('./electricityReading.model'); 
 
 module.exports = {
   Admin,
@@ -19,4 +21,6 @@ module.exports = {
   Payment,
   Contact,
   Notification,
+  Rent,
+  ElectricityReading,
 };
