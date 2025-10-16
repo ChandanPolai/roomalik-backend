@@ -118,13 +118,25 @@ const updateRoom = asyncHandler(async (req, res) => {
 });
 
 // ✅ Delete Room
+// ✅ Delete Room (Only if no tenants exist)
 const deleteRoom = asyncHandler(async (req, res) => {
-  const room = await model.Room.findById(req.params.id).populate('plotId');
+  const roomId = req.params.id;
+  
+  const room = await model.Room.findById(roomId).populate('plotId');
   if (!room) {
     return sendError(res, HTTP_STATUS.NOT_FOUND, 'Room not found');
   }
+  
+  // Check authorization
   if (room.plotId.ownerId.toString() !== req.admin._id.toString()) {
     return sendError(res, HTTP_STATUS.UNAUTHORIZED, 'Not authorized');
+  }
+
+  // Check if room has any tenants
+  const tenantsCount = await model.Tenant.countDocuments({ roomId });
+  if (tenantsCount > 0) {
+    return sendError(res, HTTP_STATUS.BAD_REQUEST, 
+      `Cannot delete room. ${tenantsCount} tenant(s) exist in this room. Please remove all tenants first.`);
   }
 
   await room.deleteOne();

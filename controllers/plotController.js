@@ -103,13 +103,26 @@ const updatePlot = asyncHandler(async (req, res) => {
 });
 
 // ✅ Delete Plot
+// ✅ Delete Plot (Only if no rooms exist)
 const deletePlot = asyncHandler(async (req, res) => {
-  const plot = await model.Plot.findById(req.params.id);
+  const plotId = req.params.id;
+  
+  // Check if plot exists
+  const plot = await model.Plot.findById(plotId);
   if (!plot) {
     return sendError(res, HTTP_STATUS.NOT_FOUND, 'Plot not found');
   }
+  
+  // Check authorization
   if (plot.ownerId.toString() !== req.admin._id.toString()) {
     return sendError(res, HTTP_STATUS.UNAUTHORIZED, 'Not authorized');
+  }
+
+  // Check if plot has any rooms
+  const roomsCount = await model.Room.countDocuments({ plotId });
+  if (roomsCount > 0) {
+    return sendError(res, HTTP_STATUS.BAD_REQUEST, 
+      `Cannot delete plot. ${roomsCount} room(s) exist in this plot. Please delete all rooms first.`);
   }
 
   await plot.deleteOne();
