@@ -116,10 +116,35 @@ const createTenant = asyncHandler(async (req, res) => {
 });
 
 // ✅ Get All Tenants
+// const getAllTenants = asyncHandler(async (req, res) => {
+//   const tenants = await model.Tenant.find({
+//     plotId: { $in: await model.Plot.find({ ownerId: req.admin._id }).distinct('_id') },
+//   }).populate('roomId plotId');
+//   return sendResponse(res, HTTP_STATUS.OK, tenants, 'Tenants retrieved successfully');
+// });
+
+// ✅ Get All Tenants with Filters
 const getAllTenants = asyncHandler(async (req, res) => {
-  const tenants = await model.Tenant.find({
-    plotId: { $in: await model.Plot.find({ ownerId: req.admin._id }).distinct('_id') },
-  }).populate('roomId plotId');
+  const { plotId, roomId } = req.query;
+  
+  // Step 1: Admin ke saare plots ki IDs
+  const adminPlotIds = await model.Plot.find({ ownerId: req.admin._id }).distinct('_id');
+  
+  // Step 2: Basic query - admin ke saare plots ke tenants
+  const query = { 
+    plotId: { $in: adminPlotIds } 
+  };
+  
+  // Step 3: Agar plotId diya hai toh SIRF us plot ke tenants
+  if (plotId) query.plotId = plotId;
+  
+  // Step 4: Agar roomId diya hai toh SIRF us room ka tenant
+  if (roomId) query.roomId = roomId;
+
+  const tenants = await model.Tenant.find(query)
+    .populate('roomId')
+    .populate('plotId');
+    
   return sendResponse(res, HTTP_STATUS.OK, tenants, 'Tenants retrieved successfully');
 });
 
