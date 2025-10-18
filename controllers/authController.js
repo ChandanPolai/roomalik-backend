@@ -145,10 +145,10 @@ const getProfile = asyncHandler(async (req, res) => {
 
 // ✅ Update Profile (with avatar upload)
 const updateProfile = asyncHandler(async (req, res) => {
-  const { error } = updateProfileSchema.validate(req.body);
-  if (error) {
-    return sendError(res, HTTP_STATUS.BAD_REQUEST, error.details[0].message);
-  }
+  // const { error } = updateProfileSchema.validate(req.body);
+  // if (error) {
+  //   return sendError(res, HTTP_STATUS.BAD_REQUEST, error.details[0].message);
+  // }
 
   const admin = await model.Admin.findById(req.admin._id);
   if (!admin) {
