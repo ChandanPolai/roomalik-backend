@@ -33,39 +33,7 @@ const {
   updateTenant,
   deleteTenant,
 } = require('./tenantController');
-const {
-  createFinance,
-  getAllFinances,
-  getFinanceById,
-  updateFinance,
-  deleteFinance,
-} = require('./financeController');
-const {
-  createBill,
-  getAllBills,
-  getBillById,
-  updateBill,
-  deleteBill,
-} = require('./electricityBillController');
-const {
-  createPayment,
-  getAllPayments,
-  getPaymentById,
-  updatePayment,
-  deletePayment,
-} = require('./paymentController');
-const {
-  createContact,
-  getAllContacts,
-  getContactById,
-  updateContact,
-  deleteContact,
-} = require('./contactController');
-const {
-  getAllNotifications,
-  markNotificationRead,
-  deleteNotification,
-} = require('./notificationController');
+
 
 module.exports = {
   registerAdmin,
@@ -75,42 +43,22 @@ module.exports = {
   resetPassword,
   changePassword,
   logoutAdmin,
+
   createPlot,
   getAllPlots,
   getPlotById,
   updatePlot,
   deletePlot,
+
   createRoom,
   getAllRooms,
   getRoomById,
   updateRoom,
   deleteRoom,
+  
   createTenant,
   getAllTenants,
   getTenantById,
   updateTenant,
   deleteTenant,
-  createFinance,
-  getAllFinances,
-  getFinanceById,
-  updateFinance,
-  deleteFinance,
-  createBill,
-  getAllBills,
-  getBillById,
-  updateBill,
-  deleteBill,
-  createPayment,
-  getAllPayments,
-  getPaymentById,
-  updatePayment,
-  deletePayment,
-  createContact,
-  getAllContacts,
-  getContactById,
-  updateContact,
-  deleteContact,
-  getAllNotifications,
-  markNotificationRead,
-  deleteNotification,
 };
