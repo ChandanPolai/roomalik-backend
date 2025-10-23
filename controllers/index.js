@@ -33,6 +33,12 @@ const {
   updateTenant,
   deleteTenant,
 } = require('./tenantController');
+const {
+  getDashboard,
+  updatePaymentStatus,
+  generatePayments,
+  getEarnings,
+} = require('./dashboardController');
 
 
 module.exports = {
@@ -61,4 +67,9 @@ module.exports = {
   getTenantById,
   updateTenant,
   deleteTenant,
+
+  getDashboard,
+  updatePaymentStatus,
+  generatePayments,
+  getEarnings,
 };

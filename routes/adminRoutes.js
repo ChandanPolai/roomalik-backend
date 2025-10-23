@@ -28,6 +28,11 @@ const {
   updateTenant,
   deleteTenant,
 
+  getDashboard,
+  updatePaymentStatus,
+  generatePayments,
+  getEarnings,
+
 } = require('../controllers/index');
 
 
@@ -37,6 +42,7 @@ const plotImageUploader = uploader('plots');
 const roomImageUploader = uploader('rooms');
 const tenantDocUploader = uploader('tenants'); 
 const adminAvatarUploader = uploader('admins');
+const paymentProofUploader = uploader('payments'); // For payment proof images
 
 // ✅ Public Routes (Auth) - No Authentication Required
 router.post('/auth/register', adminAvatarUploader.single('avatar'), registerAdmin);
@@ -95,6 +101,12 @@ router.put(
   updateTenant
 );
 router.delete('/tenants/:id', protect, deleteTenant);
+
+// ✅✅ Dashboard & Payment Routes
+router.get('/dashboard', protect, getDashboard);
+router.post('/payments/generate', protect, generatePayments); // Generate payment records
+router.put('/payments/:paymentId/status', protect, paymentProofUploader.single('paymentProof'), updatePaymentStatus); // Update payment status with proof
+router.get('/earnings', protect, getEarnings); // Get earnings report
 
 
 module.exports = router;
